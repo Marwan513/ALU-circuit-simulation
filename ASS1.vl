@@ -1,0 +1,115 @@
+//MUX 4*1
+module m41(out, a, b, c, d, s0, s1);
+  output out;
+  input a, b, c, d, s0, s1;
+  wire s0bar, s1bar, T1, T2, T3, T4;
+  not (s0bar, s0), (s1bar, s1);
+  and (T1, a, s0bar, s1bar), (T2, b, s0, s1bar),(T3, c, s0bar, s1), (T4, d, s0, s1);
+  or(out, T1, T2, T3, T4);
+endmodule
+//MUX 8*1
+module m81(out, o1, o2, o3, o4, o5, o6, o7, o8, s0, s1, s2);
+  output out;
+  input o1, o2, o3, o4, o5, o6, o7, o8, s0, s1, s2;
+  wire out1 , out2, out3, out4;
+  m41 en1(out1, o1, o2, o3, o4, s0, s1);
+  m41 en2(out2, o5, o6, o7, o8, s0, s1);
+  and(out3, out1, ~s2),(out4, out2, s2);
+  or(out, out3, out4);
+endmodule
+////////////////////////////////////////////////////////////////////////
+module half_adder(sum, carry, a, b);
+   input a, b;
+   output sum, carry;
+   xor(sum, a, b);
+   and(carry, a, b);
+endmodule
+
+module full_adder(sum, carry, x, y, z);
+   input x, y, z;
+   output sum, carry;
+   wire s1, c1, c2;
+   half_adder h1(s1, c1, x, y);
+   half_adder h2(sum, c2, s1, z);
+   or(carry, c1, c2);
+endmodule
+/////////////////////////////////////////////////////////////////////
+module bitWise(out, A, B, s0, s1);
+  output out;
+  wire a, b, c, d;
+  input A, B, s0, s1;
+  and(a, A, B);
+  or(b, A, B);
+  xor(c, A, B);
+  not(d, A);
+  m41 bt(out, a, b, c, d, s0, s1);
+endmodule
+//-----------------------------------------------------------------//
+//bitWise test bench
+module bitWiseTest(output [3:0]out, input [3:0]A, input [3:0]B, input s0, input s1);
+  generate
+  genvar i;
+  for(i=0;i<=3;i=i+1)
+   begin
+      bitWise f2(out[i],A[i],B[i],s0,s1);
+   end
+  endgenerate
+endmodule
+/////////////////////////////////////////////////////////////////////
+//adder and subtractor
+module AC(outSum, outCarry, A, B, carry, s0, s1);
+  output outSum, outCarry;
+  input A, B, carry, s0, s1;
+  wire a, b, c, d, out1;
+  buf(a, B);
+  not(b, B);
+  buf(c, 0);
+  buf(d, 1);
+  m41 Ac(out1, a, b, c, d, s0, s1);
+  full_adder ac(outSum, outCarry, A, out1, carry);
+endmodule
+//--------------------------------------------------------//
+//test bench for ACP
+module ACtest(output [3:0]out,output carry, input [3:0]A, input [3:0]B,input carryInput, input s0, input s1);
+  wire [4:0]c;
+  buf(c[0], carryInput);
+  generate
+  genvar i;
+  for(i=0;i<=3;i=i+1)
+   begin
+      AC f1(out[i],c[i+1],A[i],B[i],c[i],s0,s1);
+   end
+  endgenerate
+  buf(carry, c[4]);
+endmodule
+////////////////////////////////////////////////////////////////////
+//shift right
+module shiftRight(output [3:0]H, input [3:0]A);
+  buf(H[3],A[3]),(H[2],A[3]),(H[1],A[2]),(H[0],A[1]);
+endmodule
+////////////////////////////////////////////////////////////////////
+module main();
+    wire [3:0]A = 4'b1001;
+    wire [3:0]B = 4'b0011;
+    wire s0=0, s1=0, s2=0;
+    wire carry, carry1, carry2, carry3, carry4, carry5, carry6, carry7, carry8, f, t;
+    wire [3:0]out,out1,out2,out3,out4,out5,out6,out7,out8;
+    buf(f,0),(t,1);
+    ACtest t1(out1, carry1, A, B, f, f, f);
+    ACtest t2(out2, carry2, A, B, t, t, f);
+    ACtest t3(out3, carry3, A, B, t, f, t);
+    ACtest t4(out4, carry4, A, B, f, t, t);
+    bitWiseTest t5(out5, A, B, f, f);
+    bitWiseTest t6(out6, A, B, t, f);
+    bitWiseTest t7(out7, A, B, f, t);
+    shiftRight t8(out8, A);
+    m81 m0(out[0], out1[0], out2[0], out3[0], out4[0], out5[0], out6[0], out7[0], out8[0], s0, s1, s2);
+    m81 m1(out[1], out1[1], out2[1], out3[1], out4[1], out5[1], out6[1], out7[1], out8[1], s0, s1, s2);
+    m81 m2(out[2], out1[2], out2[2], out3[2], out4[2], out5[2], out6[2], out7[2], out8[2], s0, s1, s2);
+    m81 m3(out[3], out1[3], out2[3], out3[3], out4[3], out5[3], out6[3], out7[3], out8[3], s0, s1, s2);
+    m81 m4(carry, carry1, carry2, carry3, carry4, carry5, carry6, carry7, carry8, s0, s1, s2);
+    initial
+    begin
+      $monitor("out[3]=%b out[2]=%b out[1]=%b out[0]=%b carry=%b", out[3],out[2],out[1],out[0],carry );
+    end
+endmodule
